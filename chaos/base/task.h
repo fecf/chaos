@@ -41,7 +41,7 @@ class DispatchQueue {
   void wait();
   void enqueue(Task&& task);
   void setThreadCount(int size);
-  int queuedTaskCount() const;
+  int waitingTaskCount() const;
 
  private:
   struct Worker {

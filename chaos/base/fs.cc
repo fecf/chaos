@@ -101,26 +101,37 @@ std::vector<std::string> getCommandLineArgs() {
 const std::string kNativeSeparator =
     str::to_utf8(std::wstring(1, std::filesystem::path::preferred_separator));
 
-Handle::Handle(const std::string& path)
+FileInfo::FileInfo(const std::string& path)
     : raw_path_(path),
       valid_(false),
+      path_(),
+      name_(),
       ordinal_(),
       size_(),
       flags_(),
-      sort_type_(SortType::Unsorted),
+      created_(),
+      modified_(),
+      sort_type_(SortType::Name),
       sort_desc_(false) {
   refresh();
 }
 
-Handle& Handle::operator=(const std::string& path) {
-  raw_path_ = path;
-  refresh();
-  return *this;
+FileInfo::FileInfo(const std::string& path, FileInfo&& reference)
+    : raw_path_(path),
+      valid_(false),
+      path_(),
+      name_(),
+      ordinal_(),
+      size_(),
+      flags_(),
+      created_(),
+      modified_() {
+  refresh(std::move(reference));
 }
 
-Handle::Handle() : valid_(false) {}
+FileInfo::FileInfo() : valid_(false) {}
 
-bool Handle::refresh(bool force_refresh_children) {
+bool FileInfo::refresh(FileInfo&& reference) {
   valid_ = false;
 
   std::error_code ec;
@@ -130,18 +141,6 @@ bool Handle::refresh(bool force_refresh_children) {
   fspath = std::filesystem::weakly_canonical(fspath, ec);
   if (ec) {
     DLOG_F("failed std::filesystem::canonical(%s).", raw_path_.c_str());
-    return false;
-  }
-
-  // check if exists
-  if (!std::filesystem::exists(fspath, ec)) {
-    DLOG_F("failed std::filesystem::exists(%s) file not found.",
-        raw_path_.c_str());
-    return false;
-  }
-  if (ec) {
-    DLOG_F("failed std::filesystem::exists(%s) reason(%s).", raw_path_.c_str(),
-        ec.message());
     return false;
   }
 
@@ -157,36 +156,27 @@ bool Handle::refresh(bool force_refresh_children) {
   // convert all separators
   fspath = fspath.make_preferred();
 
+  name_ = str::from_u8string(fspath.filename().u8string());
+  path_ = str::from_u8string(fspath.u8string());
+  valid_ = true;
+
   // directory
   std::string directory;
-  bool is_directory = std::filesystem::is_directory(fspath, ec);
-  if (ec) {
-    DLOG_F("failed std::filesystem::is_directory(%s) reason(%s).", raw_path_.c_str(), ec.message().c_str());
-    return false;
-  }
-  if (is_directory) {
+  if (std::filesystem::is_directory(fspath)) {
     directory = str::from_u8string(fspath.u8string());
   } else {
     directory = str::from_u8string(fspath.parent_path().u8string());
   }
 
-  // fetch children
-  if (path_.empty() || children_.empty() || cd() != directory) {
+  if (reference.valid() && reference.cd() == directory) {
+    children_ = std::move(reference.children_);
+    sort_type_ = reference.sort_type_;
+    sort_desc_ = reference.sort_desc_;
+  } else {
     children_ = fetch_children(directory, true, false);
-    if (children_.empty()) {
-      DLOG_F("not found entry.");
-      return false;
-    }
   }
 
-  // set members
-  std::string name = str::from_u8string(fspath.filename().u8string());
-  std::string path = str::from_u8string(fspath.u8string());
-  path_ = path;
-  name_ = name;
-  valid_ = true;
-
-  // set ordinal
+  ordinal_ = 0;
   for (int i = 0; i < (int)children_.size(); ++i) {
     if (children_[i].name == name_) {
       ordinal_ = i;
@@ -196,15 +186,15 @@ bool Handle::refresh(bool force_refresh_children) {
   return true;
 }
 
-std::string Handle::raw_path() const { return raw_path_; }
+std::string FileInfo::raw_path() const { return raw_path_; }
 
-bool Handle::valid() const { return valid_; }
+bool FileInfo::valid() const { return valid_; }
 
-const std::string& Handle::path() const { return path_; }
+const std::string& FileInfo::path() const { return path_; }
 
-const std::string& Handle::name() const { return name_; }
+const std::string& FileInfo::name() const { return name_; }
 
-std::string Handle::cd() const { 
+std::string FileInfo::cd() const { 
   if (flags_ & Directory) {
     return path_;
   } else {
@@ -213,11 +203,11 @@ std::string Handle::cd() const {
   }
 }
 
-int Handle::ordinal() const { return ordinal_; }
+int FileInfo::ordinal() const { return ordinal_; }
 
-size_t Handle::size() const { return size_; }
+size_t FileInfo::size() const { return size_; }
 
-std::string Handle::parent() const {
+std::string FileInfo::parent() const {
   if (flags_ & Directory) {
     std::filesystem::path path(path_);
     std::filesystem::path parent_path(path.parent_path());
@@ -227,17 +217,17 @@ std::string Handle::parent() const {
   }
 }
 
-std::chrono::system_clock::time_point Handle::created() const {
+std::chrono::system_clock::time_point FileInfo::created() const {
   return std::chrono::system_clock::time_point();
 }
 
-std::chrono::system_clock::time_point Handle::modified() const {
+std::chrono::system_clock::time_point FileInfo::modified() const {
   return std::chrono::system_clock::time_point();
 }
 
-int Handle::flags() const { return flags_; }
+int FileInfo::flags() const { return flags_; }
 
-std::vector<DirEntry> Handle::fetch_children(const std::string& directory,
+std::vector<DirEntry> FileInfo::fetch_children(const std::string& directory,
     bool include_file, bool include_directory) const { 
   std::vector<DirEntry> children;
 
@@ -290,11 +280,11 @@ std::vector<DirEntry> Handle::fetch_children(const std::string& directory,
   return children;
 }
 
-const std::vector<DirEntry>& Handle::children() const {
+const std::vector<DirEntry>& FileInfo::children() const {
   return children_;
 }
 
-bool Handle::sort(SortType sort_type, bool sort_desc) {
+bool FileInfo::sort(SortType sort_type, bool sort_desc) {
   std::function<bool(const DirEntry&, const DirEntry&, bool)> comparer;
   if (sort_type == SortType::Name) {
     comparer = comparer::name;
@@ -323,16 +313,12 @@ bool Handle::sort(SortType sort_type, bool sort_desc) {
   return true;
 }
 
-bool Handle::is_sorted(SortType type, bool desc) const {
-  return sort_type_ != SortType::Unsorted;
-}
-
 FileStream::FileStream(const std::string& path) : handle_(), path_() {
   DWORD desired_access = GENERIC_READ;
   DWORD share_mode = FILE_SHARE_READ;
   DWORD flags = FILE_ATTRIBUTE_NORMAL;
   handle_ = ::CreateFile(path.c_str(), desired_access, share_mode, NULL,
-                         OPEN_EXISTING, flags, NULL);
+      OPEN_EXISTING, flags, NULL);
   if (handle_ == INVALID_HANDLE_VALUE) {
     throw std::runtime_error("failed CreateFile().");
   }

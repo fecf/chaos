@@ -90,7 +90,7 @@ void DispatchQueue::setThreadCount(int size) {
   }
 }
 
-int DispatchQueue::queuedTaskCount() const { return (int)pq_.size(); }
+int DispatchQueue::waitingTaskCount() const { return (int)pq_.size() + running_threads_; }
 
 void DispatchQueue::workerThread(Worker* w) {
   task::Task task;
@@ -106,15 +106,10 @@ void DispatchQueue::workerThread(Worker* w) {
     }
     cv_.notify_all();
 
+    w->cancel = false;
     running_threads_++;
-    if (!w->cancel) {
-      task.func(w->cancel);
-    }
-    {
-      std::unique_lock lock(mutex_);
-      w->cancel = false;
-      running_threads_--;
-    }
+    task.func(w->cancel);
+    running_threads_--;
     cv_.notify_all();
   }
 }

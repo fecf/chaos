@@ -82,8 +82,10 @@ void Engine::Destroy() {
 }
 
 void Engine::UseLogger() {
+#ifdef _DEBUG
   minlog::add_sink(minlog::sink::cout());
   minlog::add_sink(minlog::sink::debug());
+#endif
 }
 
 void Engine::UseWindow() {

@@ -73,8 +73,9 @@ std::unique_ptr<Image> WinRTRW::Read(const std::string& path, int pos,
   th.join();
 
   if (exptr) {
-    std::rethrow_exception(exptr);
+    return nullptr;
   }
+
   return std::unique_ptr<Image>(new Image(w, h, stride, PixelFormat::RGBA8, 4, ColorSpace::sRGB, std::move(buffer)));
 }
 

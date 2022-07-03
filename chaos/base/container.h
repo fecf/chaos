@@ -38,12 +38,9 @@ class LRUCache {
   LRUCache(size_t capacity) : capacity_(capacity) {}
   ~LRUCache() {}
 
-  LRUCache(const LRUCache&) { __debugbreak();
-  }
-  LRUCache& operator=(const LRUCache&) { 
-    __debugbreak();
-    return *this;
-  }
+  LRUCache(const LRUCache&) = delete;
+  LRUCache& operator=(const LRUCache&) = delete;
+
   LRUCache(LRUCache&&) = default;
   LRUCache& operator=(LRUCache&&) = default;
 

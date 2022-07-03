@@ -15,7 +15,6 @@ std::string getFontDirectory();
 std::vector<std::string> getCommandLineArgs();
 
 enum class SortType {
-  Unsorted,
   Name,
   Size,
   Created,
@@ -34,7 +33,7 @@ struct DirEntry {
   int ordinal;
 };
 
-class Handle {
+class FileInfo {
  public:
   enum Flags {
     None = 0x00,
@@ -44,9 +43,9 @@ class Handle {
   };
   using Time = std::chrono::system_clock::time_point;
 
-  Handle();
-  explicit Handle(const std::string& path);
-  Handle& operator=(const std::string& path);
+  FileInfo();
+  explicit FileInfo(const std::string& path);
+  explicit FileInfo(const std::string& path, FileInfo&& reference);
 
   std::string raw_path() const;
   bool valid() const;
@@ -62,12 +61,11 @@ class Handle {
 
   const std::vector<DirEntry>& children() const;
   bool sort(SortType sort_type = SortType::Name, bool sort_desc = false);
-  bool is_sorted(SortType type, bool desc) const;
 
  private:
   std::vector<DirEntry> fetch_children(const std::string& fullpath,
       bool include_file, bool include_directory) const;
-  bool refresh(bool force_refresh_children = false);
+  bool refresh(FileInfo&& reference = {});
 
  private:
   std::string raw_path_;
