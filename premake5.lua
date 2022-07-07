@@ -4,6 +4,7 @@ workspace (name)
     configurations { "Debug", "Release" }
     platforms { "x64" }
     cppdialect "C++20"
+    location "build"
 
 project (name)
     kind "StaticLib"
@@ -14,26 +15,27 @@ project (name)
     platforms { "x64" }
     flags { "MultiProcessorCompile", "NoMinimalRebuild" } -- /MP
 
+    location "build"
     objdir "build/obj/%{cfg.platform}/%{cfg.buildcfg}"
     targetdir "build/bin/%{cfg.platform}/%{cfg.buildcfg}"
 
     files {
-        name .. "/**.cc",
-        name .. "/**.cpp",
-        name .. "/**.h",
+        "**.cc",
+        "**.cpp",
+        "**.h",
     }
     includedirs { 
-        name,
-        "chaos/graphics/impl/directxheaders/include",
-        "chaos/graphics/impl/directxheaders/include/directx",
-        "chaos/graphics/impl/directxheaders/include/dxguids",
-        "chaos/graphics/impl/directxheaders/include/wsl",
-        "chaos/graphics/impl/d3d12memoryallocator",
-        "chaos/extras"
+        "./",
+        "graphics/impl/directxheaders/include",
+        "graphics/impl/directxheaders/include/directx",
+        "graphics/impl/directxheaders/include/dxguids",
+        "graphics/impl/directxheaders/include/wsl",
+        "graphics/impl/d3d12memoryallocator",
+        "extras"
     }
-    removefiles { "chaos/examples/**" }
+    removefiles { "examples/**" }
 
-    pchsource (name .. "/pch.cc")
+    pchsource "pch.cc"
     pchheader "pch.h"
     forceincludes { "pch.h" }
 
@@ -59,41 +61,15 @@ project (name)
     filter { "files:**.fs.hlsl" }
         buildcommands { "dxc -T ps_6_5 %{file.relpath} -Zpr -Fh " .. shader_header_path .. " -Vn " .. shader_variable_name }
 
---[[
-project (name .. ".test")
-    dependson {name}
-    kind "ConsoleApp"
-    files { 
-        name .. "/tests/*.cc",
-        name .. "/tests/*.h",
-    }
-    links { "build/bin/%{cfg.platform}/%{cfg.buildcfg}/" .. name .. ".lib" }
-    includedirs { "./" }
-
-    objdir "build/obj/%{cfg.platform}/%{cfg.buildcfg}"
-    targetdir "build/bin/%{cfg.platform}/%{cfg.buildcfg}"
-
-    filter { "platforms:x64" }
-        system "Windows"
-        architecture "x86_64"
-        buildoptions { "/execution-charset:utf-8" }
-    filter { "configurations:Debug" }
-        defines { "_DEBUG" }
-        optimize "Debug"
-        symbols "On"
-    filter { "configurations:Release" }
-        defines { "NDEBUG" }
-        optimize "Speed"
-]]
-
 project (name .. ".examples.helloworld")
     dependson {name}
 
     kind "ConsoleApp"
-    files { name .. "/examples/helloworld/*.*" }
+    files { "examples/helloworld/*.*" }
     links { "build/bin/%{cfg.platform}/%{cfg.buildcfg}/" .. name .. ".lib" }
     includedirs { "./" }
 
+    location "build"
     objdir "build/obj/%{cfg.platform}/%{cfg.buildcfg}"
     targetdir "build/bin/%{cfg.platform}/%{cfg.buildcfg}"
 
